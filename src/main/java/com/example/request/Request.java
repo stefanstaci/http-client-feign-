@@ -1,7 +1,5 @@
 package com.example.request;
 
-import lombok.AllArgsConstructor;
-import lombok.NoArgsConstructor;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
@@ -10,11 +8,12 @@ import org.springframework.web.client.RestTemplate;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 @RestController
 @RequestMapping("/request")
 @RequiredArgsConstructor
-public class Request implements Runnable {
+public class Request {
 
     private final RestTemplate restTemplate;
 
@@ -31,8 +30,8 @@ public class Request implements Runnable {
     @PostMapping("/save")
     public Client createClients(@RequestBody Client client) {
         HttpHeaders headers = new HttpHeaders();
-        headers.setAccept(Arrays.asList(MediaType.APPLICATION_JSON));
-        HttpEntity<Client> entity = new HttpEntity<Client>(client, headers);
+        headers.setAccept(List.of(MediaType.APPLICATION_JSON));
+        HttpEntity<Client> entity = new HttpEntity<>(client, headers);
 
         ResponseEntity<Client> response = restTemplate.exchange(
                 "http://localhost:9999/api/save", HttpMethod.POST, entity, Client.class);
@@ -42,22 +41,24 @@ public class Request implements Runnable {
 
     @PostMapping("/save/all")
     public List<Client> createAllClients(@RequestBody List<Client> client) {
-        HttpHeaders headers = new HttpHeaders();
-        headers.setAccept(Arrays.asList(MediaType.APPLICATION_JSON));
-        for (Client c : client) {
-            HttpEntity<Client> entity = new HttpEntity<>(c,headers);
-            restTemplate.exchange(
-                    "http://localhost:9999/api/save", HttpMethod.POST, entity, c.getClass());
-        }
-        return client;
-    }
+        try(ExecutorService executorService = Executors.newCachedThreadPool()) {
+            HttpHeaders headers = new HttpHeaders();
+            headers.setAccept(List.of(MediaType.APPLICATION_JSON));
+            client.forEach(c -> executorService.submit(() -> {
+                HttpEntity<Client> entity = new HttpEntity<>(c, headers);
+                restTemplate.exchange(
+                        "http://localhost:9999/api/save", HttpMethod.POST, entity, c.getClass());
+            }));
+//        for (Client c : client) {
+//            executorService.submit(() -> {
+//                HttpEntity<Client> entity = new HttpEntity<>(c,headers);
+//                restTemplate.exchange(
+//                        "http://localhost:9999/api/save", HttpMethod.POST, entity, c.getClass());
+//            });
+//
+//        }
+            return client;
 
-
-    @Override
-    public void run() {
-        try {
-        } catch (Exception e) {
-            System.out.println("Exception is caught");
         }
     }
 }
